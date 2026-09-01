@@ -114,8 +114,8 @@ class IPC(object):
 
         Returns
         -------
-        None
-            The result is written back into ``img``.
+        numpy.ndarray
+            The convolved array (the same buffer that was updated in place).
         """
         if isinstance(img, galsim.Image):
             img_arr = img.array
@@ -123,17 +123,18 @@ class IPC(object):
             img_arr = img
 
         if img_arr.ndim == 2:
-            img_arr = ndimage.convolve(
-                img_arr, self.ipc_kernel, mode=edge_treatment, cval=fill_value
-            )
-        elif img_arr.ndim == 3:  # Convolution on 3D resultants
-            img_arr = ndimage.convolve(
-                img_arr,
-                self.ipc_kernel[None, ...],
-                mode=edge_treatment,
-                cval=fill_value,
-            )
-        if isinstance(img, galsim.Image):
-            img.array = img_arr
+            kernel = self.ipc_kernel
+        elif img_arr.ndim == 3:  # convolve each resultant plane independently
+            kernel = self.ipc_kernel[None, ...]
         else:
-            img = img_arr
+            raise ValueError(
+                "IPC.apply expects a 2D image or a 3D resultants array; got "
+                f"{img_arr.ndim}D"
+            )
+
+        # Assigning through img_arr[:] mutates the caller's array (and, for a
+        # galsim.Image, the image buffer the .array view points at).
+        img_arr[:] = ndimage.convolve(
+            img_arr, kernel, mode=edge_treatment, cval=fill_value
+        )
+        return img_arr

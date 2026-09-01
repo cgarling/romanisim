@@ -804,7 +804,14 @@ def test_image_input(tmpdir):
     tab.meta['real_galaxy_catalog_filename'] = str(base_rgc_filename) + '.fits'
 
     # render the image
-    res = image.simulate(meta, tab, usecrds=False, psftype='galsim')
+    # crparam=None: with cosmic rays enabled, IPC (applied to the resultants in
+    # l1.make_l1) spreads each CR's charge into its neighboring pixels, which
+    # are not jump-flagged.  fit_ramps_casertano only breaks ramps at flagged
+    # resultants, so those neighbors get an undetected mid-ramp jump and an
+    # inflated slope, which throws off this total-flux check. We turn off CRs
+    # here to avoid that problem.
+    res = image.simulate(meta, tab, usecrds=False, psftype='galsim',
+                         crparam=None)
 
     # did we get all the flux?
     totflux = np.sum(res[0].data - np.median(res[0].data))

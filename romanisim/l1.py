@@ -671,28 +671,32 @@ def read_pattern_to_tij(read_pattern, reference_read=False):
     return tij
 
 
-def add_ipc(resultants, ipc_kernel=None):
+def add_ipc(resultants, ipc_kernel=None, mode='constant', cval=0):
     """Add IPC to resultants.
 
     Parameters
     ----------
     resultants : np.ndarray[n_resultant, ny, nx]
         resultants describing a scene
+    ipc_kernel : np.ndarray[3, 3] or None
+        IPC convolution kernel.  Defaults to ``romanisim.models.ipc.ipc_kernel``.
+    mode, cval
+        Boundary handling, passed to ``scipy.ndimage.convolve``.  The default
+        (``'constant'``, 0) is appropriate when the array carries only flux
+        (e.g. a PSF stamp); callers whose array includes the reset pedestal
+        should pass ``mode='nearest'`` so the border is not pulled toward zero.
 
     Returns
     -------
     np.ndarray[n_resultant, ny, nx]
         resultants with IPC
     """
-    # add in IPC
-    # the reference pixels have basically no flux, so for these real pixels we
-    # extend the array with a constant equal to zero.
     if ipc_kernel is None:
         ipc_kernel = ipc.ipc_kernel
 
     log.info('Adding IPC...')
     out = ndimage.convolve(resultants, ipc_kernel[None, ...],
-                           mode='constant', cval=0)
+                           mode=mode, cval=cval)
     return out
 
 
@@ -780,10 +784,15 @@ def make_l1(counts, read_pattern,
 
     # roman.addReciprocityFailure(resultants_object)
 
+    # Both branches return the convolved resultants; add_ipc does not modify
+    # its argument in place, so the result must be captured.  resultants
+    # include the reset pedestal; on a real detector the science array is
+    # bordered by reference pixels near that same level, so extend the edge
+    # with 'nearest' rather than zero to avoid pulling the border down.
     if ipc_model is not None:
-        ipc_model.apply(resultants)
+        resultants = ipc_model.apply(resultants, edge_treatment='nearest')
     else:
-        add_ipc(resultants)
+        resultants = add_ipc(resultants, mode='nearest')
 
     # resultants are in electrons
     if gain is None:
