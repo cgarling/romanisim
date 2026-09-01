@@ -96,3 +96,56 @@ def test_get_gridded_psf_model_uses_noipc():
     # guard against the reference file shipping identical arrays, which would
     # make the check above pass vacuously
     assert not np.array_equal(noipc, withipc)
+
+
+def test_epsf_noipc_plus_romanisim_ipc_matches_psf():
+    """Convolving the reference ``psf_noipc`` array with romanisim's IPC kernel
+    must reproduce the reference ``psf`` array to high precision.
+
+    This checks that romanisim applies the IPC kernel in the same orientation
+    that was used to build the CRDS ePSF reference (i.e. no transpose or axis
+    flip between the implementations).  The correct orientation matches at
+    ~5e-8 while the most favorable wrong orientation (``fliplr`` of the kernel)
+    differs at ~1e-4.
+
+    Notes
+    -----
+    The reference ``psf`` array was produced by stpsf using a kernel that
+    matches romanisim's built-in default ``romanisim.models.ipc.ipc_kernel``
+    (both descend from the same draft WFI simulation documentation).  A change
+    to either kernel would legitimately break this test.  This exercises only
+    the ``usecrds=False`` kernel path; with ``usecrds=True`` ``make_l1`` applies
+    the CRDS ``ipc`` reference kernel instead, which differs from this one by
+    ~15-25% in the wings.
+    """
+    from romanisim import l1
+    from romanisim.models.ipc import ipc_kernel
+
+    focus, spectral_type, grid_index = 0, 1, 4
+    model = psf.get_epsf_from_crds(3, 'F087')
+
+    noipc = np.asarray(model.psf_noipc[focus, spectral_type, grid_index],
+                       dtype=np.float64)
+    withipc = np.asarray(model.psf[focus, spectral_type, grid_index],
+                         dtype=np.float64)
+
+    # No kernel argument -> uses the default romanisim.models.ipc.ipc_kernel,
+    # the same path make_l1 takes when ipc_model is None.
+    convolved = l1.add_ipc(noipc[None, :, :])[0]
+
+    # psf and psf_noipc in the reference file carry a constant relative
+    # normalization (withipc.sum() / noipc.sum() =  0.994599), so
+    # compare after normalizing both to unit sum.  The metric is the largest
+    # absolute deviation as a fraction of the reference peak.
+    ref = withipc / withipc.sum()
+
+    def peak_resid(arr):
+        arr = arr / arr.sum()
+        return np.max(np.abs(arr - ref)) / np.max(ref)
+
+    assert peak_resid(convolved) < 1e-6
+
+    # The kernel is asymmetric enough that a flipped application is caught:
+    # this proves the check above is actually orientation-sensitive.
+    flipped = l1.add_ipc(noipc[None, :, :], np.asarray(ipc_kernel)[:, ::-1])[0]
+    assert peak_resid(flipped) > 1e-5
