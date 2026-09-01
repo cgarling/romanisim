@@ -107,16 +107,6 @@ def test_epsf_noipc_plus_romanisim_ipc_matches_psf():
     flip between the implementations).  The correct orientation matches at
     ~5e-8 while the most favorable wrong orientation (``fliplr`` of the kernel)
     differs at ~1e-4.
-
-    Notes
-    -----
-    The reference ``psf`` array was produced by stpsf using a kernel that
-    matches romanisim's built-in default ``romanisim.models.ipc.ipc_kernel``
-    (both descend from the same draft WFI simulation documentation).  A change
-    to either kernel would legitimately break this test.  This exercises only
-    the ``usecrds=False`` kernel path; with ``usecrds=True`` ``make_l1`` applies
-    the CRDS ``ipc`` reference kernel instead, which differs from this one by
-    ~15-25% in the wings.
     """
     from romanisim import l1
     from romanisim.models.ipc import ipc_kernel
