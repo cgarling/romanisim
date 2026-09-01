@@ -78,3 +78,21 @@ def test_get_epsf_from_crds_detector_varies_by_sca():
     model1 = psf.get_epsf_from_crds(1, filter_name)
     model2 = psf.get_epsf_from_crds(2, filter_name)
     assert model1.meta.instrument.detector != model2.meta.instrument.detector
+
+
+def test_get_gridded_psf_model_uses_noipc():
+    """The gridded PSF model must be built from the IPC-free ``psf_noipc``
+    array, not the IPC-convolved ``psf`` array.  romanisim.l1.make_l1 applies
+    IPC to the resultants, so using ``psf`` here would convolve IPC twice."""
+    focus, spectral_type = 0, 1
+    model = psf.get_epsf_from_crds(3, 'F087')
+    gridded = psf.get_gridded_psf_model(
+        model, focus=focus, spectral_type=spectral_type)
+
+    noipc = np.asarray(model.psf_noipc[focus, spectral_type])
+    withipc = np.asarray(model.psf[focus, spectral_type])
+
+    np.testing.assert_array_equal(gridded.data, noipc)
+    # guard against the reference file shipping identical arrays, which would
+    # make the check above pass vacuously
+    assert not np.array_equal(noipc, withipc)
