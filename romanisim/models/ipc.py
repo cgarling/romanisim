@@ -108,19 +108,10 @@ class IPC(object):
             provided, its ``.array`` is updated.
         edge_treatment : {"constant","nearest","reflect","mirror","wrap"}, optional
             Boundary handling mode passed to ``scipy.ndimage.convolve``.
-            Resultants do not include the reference pixels, so the pixels
-            just off the edge of the array are science pixels at a level
-            similar to those just inside it; ``'nearest'`` is accordingly
-            the default.  Arrays carrying only flux (e.g., a PSF stamp)
-            should instead be convolved with ``edge_treatment='constant'``,
-            ``fill_value=0``.
+            Default of ``'nearest'`` limits the effect of IPC on the border of
+            the array.
         fill_value : float, optional
             Fill value used when ``edge_treatment='constant'`` (default: 0.0).
-
-        Returns
-        -------
-        None
-            The result is written back into ``img``.
         """
         if isinstance(img, galsim.Image):
             img_arr = img.array

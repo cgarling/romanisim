@@ -682,17 +682,13 @@ def add_ipc(resultants, ipc_kernel=None, mode='nearest', cval=0):
         IPC convolution kernel.  Defaults to
         ``romanisim.models.ipc.ipc_kernel``.
     mode, cval
-        Boundary handling, passed to ``scipy.ndimage.convolve``.  The
-        resultants do not include the reference pixels, so the pixels just
-        off the edge of the array are science pixels at a level similar to
-        those just inside it; ``'nearest'`` is accordingly the default.
-        Arrays carrying only flux (e.g., a PSF stamp) should instead be
-        convolved with ``mode='constant'``, ``cval=0``.
-
-    Returns
-    -------
-    None
-        The result is written back into ``resultants``.
+        Boundary handling, passed to ``scipy.ndimage.convolve``.  These
+        parameters handle the treatment of IPC at the edge of the array.
+        The default of ``nearest`` assumes that pixels just off the array
+        are similar to those just inside it, reducing the effect of IPC
+        there.  mode='constant', cval=0 corresponds to averaging with
+        zero-flux pixels and would correspond, e.g., to high background
+        pixels being averaged with zero flux reference border pixels.
     """
     if ipc_kernel is None:
         ipc_kernel = ipc.ipc_kernel
@@ -707,9 +703,9 @@ def expand_jump_flags(dq, kernel_shape=(3, 3)):
 
     IPC redistributes the charge a cosmic ray deposits into the neighboring
     pixels, so the ramps of those pixels have jumps in them too.  romanisim
-    flags jumps by fiat---we know where we put the CRs and pretend that the
-    pipeline has found them---and this keeps that idealization consistent
-    with the IPC that has been applied.
+    flags jumps artificially---we know where we put the CRs and pretend that
+    the pipeline has found them---and this keeps that idealization consistent
+    with the IPC application.
 
     Parameters
     ----------
@@ -717,11 +713,6 @@ def expand_jump_flags(dq, kernel_shape=(3, 3)):
         DQ array marking CR hits in resultants.  Modified in place.
     kernel_shape : tuple[int, int]
         Shape of the IPC kernel over which the charge has been spread.
-
-    Returns
-    -------
-    None
-        The result is written back into ``dq``.
     """
     jump = parameters.dqbits['jump_det']
     # a (1, ny, nx) structuring element dilates each resultant separately
@@ -815,7 +806,6 @@ def make_l1(counts, read_pattern,
 
     # roman.addReciprocityFailure(resultants_object)
 
-    # both of these convolve the resultants with the IPC kernel in place.
     if ipc_model is not None:
         ipc_model.apply(resultants)
         ipc_kernel = ipc_model.ipc_kernel
