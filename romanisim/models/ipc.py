@@ -97,25 +97,30 @@ class IPC(object):
         
         self.ipc_kernel /= np.sum(self.ipc_kernel)
 
-    def apply(self, img, edge_treatment="constant", fill_value=0.0):
-        """Apply IPC convolution to an image (in-place).
+    def apply(self, img, edge_treatment="nearest", fill_value=0.0):
+        """Apply IPC convolution to an image, in place.
 
         Parameters
         ----------
         img : numpy.ndarray or galsim.Image
-            The image to convolve. If a ``galsim.Image`` is provided, its
-            ``.array`` will be updated. If a NumPy array is provided, the
-            input array is overwritten via ``img[:] = ...``.
+            The image to convolve; either a 2D image or a 3D stack of
+            resultants.  Modified in place; if a ``galsim.Image`` is
+            provided, its ``.array`` is updated.
         edge_treatment : {"constant","nearest","reflect","mirror","wrap"}, optional
-            Boundary handling mode passed to ``scipy.ndimage.convolve``
-            (default: ``'constant'``).
+            Boundary handling mode passed to ``scipy.ndimage.convolve``.
+            Resultants do not include the reference pixels, so the pixels
+            just off the edge of the array are science pixels at a level
+            similar to those just inside it; ``'nearest'`` is accordingly
+            the default.  Arrays carrying only flux (e.g., a PSF stamp)
+            should instead be convolved with ``edge_treatment='constant'``,
+            ``fill_value=0``.
         fill_value : float, optional
             Fill value used when ``edge_treatment='constant'`` (default: 0.0).
 
         Returns
         -------
-        numpy.ndarray
-            The convolved array (the same buffer that was updated in place).
+        None
+            The result is written back into ``img``.
         """
         if isinstance(img, galsim.Image):
             img_arr = img.array
@@ -124,7 +129,7 @@ class IPC(object):
 
         if img_arr.ndim == 2:
             kernel = self.ipc_kernel
-        elif img_arr.ndim == 3:  # convolve each resultant plane independently
+        elif img_arr.ndim == 3:  # convolution on 3D resultants
             kernel = self.ipc_kernel[None, ...]
         else:
             raise ValueError(
@@ -132,9 +137,8 @@ class IPC(object):
                 f"{img_arr.ndim}D"
             )
 
-        # Assigning through img_arr[:] mutates the caller's array (and, for a
-        # galsim.Image, the image buffer the .array view points at).
-        img_arr[:] = ndimage.convolve(
+        # assigning through img_arr[...] mutates the caller's array (and, for
+        # a galsim.Image, the buffer that .array is a view of).
+        img_arr[...] = ndimage.convolve(
             img_arr, kernel, mode=edge_treatment, cval=fill_value
         )
-        return img_arr

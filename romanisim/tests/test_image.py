@@ -804,14 +804,7 @@ def test_image_input(tmpdir):
     tab.meta['real_galaxy_catalog_filename'] = str(base_rgc_filename) + '.fits'
 
     # render the image
-    # crparam=None: with cosmic rays enabled, IPC (applied to the resultants in
-    # l1.make_l1) spreads each CR's charge into its neighboring pixels, which
-    # are not jump-flagged.  fit_ramps_casertano only breaks ramps at flagged
-    # resultants, so those neighbors get an undetected mid-ramp jump and an
-    # inflated slope, which throws off this total-flux check. We turn off CRs
-    # here to avoid that problem.
-    res = image.simulate(meta, tab, usecrds=False, psftype='galsim',
-                         crparam=None)
+    res = image.simulate(meta, tab, usecrds=False, psftype='galsim')
 
     # did we get all the flux?
     totflux = np.sum(res[0].data - np.median(res[0].data))
@@ -892,8 +885,12 @@ def make_image_psftype(psftype='epsf'):
         o.sky_pos = center
         o.flux[filter_name] /= abfluxdict[f'SCA{sca:02}'][filter_name]
         o.flux[filter_name] *= 10  # Make source 10x brighter for better SNR
+    # no CRs: romanisim draws a whole detector's worth of cosmic rays
+    # regardless of the size of the image being simulated, so on these 100x100
+    # images most pixels are flagged in most resultants and the recovered
+    # fluxes are dominated by which reads survived rather than by the PSF.
     l2 = image.simulate(meta, graycat, psftype=psftype, level=2,
-                        usecrds=False, crparam=dict(),
+                        usecrds=False, crparam=None,
                         psf_keywords=psf_keywords)
     return l2[0]
 
