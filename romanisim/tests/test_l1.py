@@ -12,7 +12,6 @@ Routines tested:
 
 import pytest
 import numpy as np
-from scipy import ndimage
 from romanisim import l1, log
 from romanisim.models import parameters, nonlinearity, ipc
 import galsim
@@ -32,6 +31,15 @@ read_pattern_list = [
     [[1]],
     [[1], [10]],
 ]
+
+
+def identity_ipc():
+    """An IPC model whose kernel is the identity, i.e. IPC effectively disabled.
+    Useful for isolating tests from the effect of IPC.
+    """
+    model = ipc.IPC(usecrds=False)
+    model.ipc_kernel = np.array([[0, 0, 0], [0, 1, 0], [0, 0, 0]], dtype=float)
+    return model
 
 
 def test_validate_times():
@@ -354,19 +362,18 @@ def test_make_l1_and_asdf(tmp_path):
                                     read_pattern, gain=1,  # electron/DN
                                     saturation=10**6)  # DN
         assert np.all((dq[-1] & parameters.dqbits['saturated']) != 0)
+        # Disable IPC by using an identity kernel so that the only departures from
+        # the pedestal are the cosmic rays.
         resultants, dq = l1.make_l1(galsim.Image(np.zeros((100, 100))),
                                     read_pattern, gain=1,  # electron/DN
                                     read_noise=0,  # DN
                                     pedestal_extra_noise=0,  # electron
-                                    crparam=dict())
+                                    crparam=dict(),
+                                    ipc_model=identity_ipc())
         # technically, resultants are in DN and pedestal is in electrons,
         # but in this test the gain is one and so we ignore this distinction.
-        # With zero flux the resultant sits at the pedestal everywhere except
-        # at cosmic rays; IPC then spreads a hit pixel's charge into its 3x3
-        # neighborhood, none of which is itself jump-flagged.
-        jump = (dq[0] & parameters.dqbits['jump_det']) != 0
-        jump = ndimage.binary_dilation(jump, structure=np.ones((3, 3), bool))
-        assert np.all((resultants[0] - parameters.pedestal == 0) | jump)
+        assert np.all((resultants[0] - parameters.pedestal == 0)
+                      | ((dq[0] & parameters.dqbits['jump_det']) != 0))
     log.info('DMS227: successfully made an L1 file that validates.')
 
 
