@@ -1158,12 +1158,20 @@ def make_asdf(slope, slopevar_rn, slopevar_poisson, metadata=None,
         out['dq'][:, :] = dq
 
     def assign_with_default_types(fielddict, out):
-        # assign fields with existing types, only if they're already
-        # present.
+        # assign fields with the types the datamodel uses.  A field the
+        # freshly created model has left unpopulated still has a dtype
+        # declared in the schema; use that rather than skipping the field,
+        # which would drop it from the output file entirely.
+        schema_properties = out.get_schema().get('properties', {})
         for field in fielddict:
-            if out.get(field, None) is None:
-                continue
-            dtype = out[field].dtype
+            present = out.get(field, None)
+            if present is not None:
+                dtype = present.dtype
+            else:
+                datatype = schema_properties.get(field, {}).get('datatype')
+                if datatype is None:
+                    continue
+                dtype = np.dtype(datatype)
             out[field] = fielddict[field].astype(dtype)
 
     fielddict = dict(

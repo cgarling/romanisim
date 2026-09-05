@@ -588,6 +588,28 @@ def test_simulate():
     af.validate()
     log.info('DMS216: successfully made a L2 file.')
 
+    # a level 2 simulation delivers the full variance decomposition, not
+    # just the total error: err, var_poisson, var_rnoise and var_flat, each
+    # at the image shape and the dtype the schema declares, with err the
+    # quadrature sum of the components.
+    schema_properties = l2.get_schema()['properties']
+    for field in ('err', 'var_poisson', 'var_rnoise', 'var_flat'):
+        assert field in l2, f'L2 file is missing {field}'
+        assert l2[field].shape == l2['data'].shape
+        assert l2[field].dtype == np.dtype(
+            schema_properties[field]['datatype'])
+    var_poisson = l2['var_poisson'].astype('f4')
+    var_rnoise = l2['var_rnoise'].astype('f4')
+    var_flat = l2['var_flat'].astype('f4')
+    # pixels whose ramps are entirely flagged DO_NOT_USE (e.g. by cosmic
+    # rays) get zero variance, so only require non-negative here.
+    assert np.all(var_rnoise >= 0)
+    assert np.all(var_poisson >= 0)
+    assert np.all(var_flat >= 0)
+    assert np.any(var_rnoise > 0)
+    assert np.allclose(l2['err'].astype('f4') ** 2,
+                       var_poisson + var_rnoise + var_flat, rtol=1e-2)
+
     imwcs = l2['meta'].get('wcs', None)
     assert imwcs is not None
     # nice if L2 images include the WCS.
